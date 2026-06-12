@@ -28,6 +28,7 @@ import {
   ShotInput,
 } from '../sim/types';
 import { BallVisual } from '../render/BallVisual';
+import { BallTracker } from '../render/BallTracker';
 import { CameraDirector } from '../render/CameraDirector';
 import { Effects } from '../render/Effects';
 import { Field } from '../render/Field';
@@ -66,7 +67,10 @@ export class Game {
   private field: Field;
   private stadium: Stadium;
   private ballVis: BallVisual;
+  private tracker: BallTracker;
   private effects: Effects;
+  /** Cinematic time dilation (slow-mo at bat contact). */
+  private timeScale = 1;
   private hud = new Hud();
   private input = new Input();
   private audio = new AudioManager();
@@ -124,7 +128,9 @@ export class Game {
     this.stadium = new Stadium();
     this.sm.scene.add(this.stadium.group);
     this.ballVis = new BallVisual(this.sm.scene);
+    this.ballVis.attachCamera(this.sm.camera);
     this.ballVis.visible = false;
+    this.tracker = new BallTracker(this.sm.scene);
     this.effects = new Effects(this.sm.scene);
 
     this.aimMarker = new THREE.Mesh(
@@ -147,9 +153,12 @@ export class Game {
 
     let last = performance.now();
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const rawDt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      this.update(dt * this.turbo);
+      // Recover from slow-mo; disabled under turbo so headless runs stay fast.
+      if (this.turbo > 1) this.timeScale = 1;
+      else this.timeScale += (1 - this.timeScale) * Math.min(1, 2.4 * rawDt);
+      this.update(rawDt * this.turbo * this.timeScale);
       this.sm.render();
       this.input.flush();
       requestAnimationFrame(loop);
@@ -394,6 +403,7 @@ export class Game {
     this.deadHandled = false;
     this.ballVis.visible = false;
     this.ballVis.clearTrail();
+    this.tracker.reset();
     this.aimMarker.visible = false;
     this.hud.updateScore(this.match);
     this.hud.updateBallInfo(this.match, this.overSymbols);
@@ -491,6 +501,7 @@ export class Game {
     this.ballVis.visible = true;
     this.ballVis.clearTrail();
     this.shotTaken = false;
+    this.hud.showSpeed(this.delivery.speedKph);
 
     if (!this.match.userIsBatting) {
       // AI batter decides instantly; resolve now and play it out.
@@ -551,6 +562,7 @@ export class Game {
     this.phaseTime += dt;
     this.stadium.update(dt, this.time);
     this.effects.update(dt);
+    this.tracker.update(dt);
     this.cam.update(dt, this.time);
 
     for (const a of [this.striker, this.nonStriker, this.bowlerActor, this.keeperActor, this.umpire, ...this.fielderActors, ...this.rigDebugActors]) {
@@ -699,6 +711,7 @@ export class Game {
       this.effects.addPitchMarker(this.liveBall.pos.x, this.liveBall.pos.z);
     }
     this.ballVis.setPosition(this.liveBall.pos.x, this.liveBall.pos.y, this.liveBall.pos.z);
+    this.tracker.record(this.liveBall.pos.x, this.liveBall.pos.y, this.liveBall.pos.z);
 
     const elapsed = this.time - this.releaseTime;
 
@@ -762,6 +775,8 @@ export class Game {
 
     if (hitBall) {
       this.audio.batHit(r.quality === 'perfect' ? 1 : 0.6);
+      this.tracker.appendPath(r.path);
+      if (this.turbo === 1) this.timeScale = 0.3; // cinematic beat on contact
       this.cam.setMode('ballFollow');
       // Send the chosen fielder after the ball.
       if (r.intercept && r.intercept.fielderIndex > 0) {
@@ -806,6 +821,7 @@ export class Game {
       // Missed/bowled/keeper: continue real physics to the stumps/keeper.
       stepBall(this.liveBall, dt, this.delivery.swing, this.delivery.turn);
       this.ballVis.setPosition(this.liveBall.pos.x, this.liveBall.pos.y, this.liveBall.pos.z);
+      this.tracker.record(this.liveBall.pos.x, this.liveBall.pos.y, this.liveBall.pos.z);
       if (out.wicket?.how === 'bowled' && this.liveBall.pos.z <= 0.05 && !this.deadHandled) {
         this.deadHandled = true;
         this.effects.explodeStumps(this.field.strikerStumps, new THREE.Vector3(this.liveBall.vel.x, this.liveBall.vel.y, this.liveBall.vel.z));
@@ -849,6 +865,7 @@ export class Game {
 
     const isWicket = !!out.wicket;
     const big = out.boundary !== undefined || isWicket;
+    if (big) this.tracker.show(1.8);
     if (big) {
       this.hud.showBanner(
         isWicket ? (out.wicket!.how === 'runout' ? 'RUN OUT!' : out.wicket!.how === 'lbw' ? 'LBW!' : out.wicket!.how === 'caught' ? 'CAUGHT!' : 'BOWLED!') : out.boundary === 6 ? 'SIX!' : 'FOUR!',

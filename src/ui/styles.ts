@@ -97,6 +97,15 @@ table.scorecard tr.striker td { color: #ffd84d; font-weight: 700; }
 #meter-zone { position: absolute; top:0; bottom:0; background: rgba(85,220,110,0.45); }
 #meter-bar { position: absolute; top: 0; bottom: 0; width: 5px; background: #ffd84d; }
 
+#speed-gun {
+  position: absolute; top: 110px; right: 16px;
+  background: linear-gradient(180deg, rgba(8,12,24,0.9), rgba(20,30,52,0.9));
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+  padding: 8px 16px; font-size: 14px; color: #9fb6d4;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+#speed-gun .kph { font-size: 24px; font-weight: 800; color: #ffd84d; font-variant-numeric: tabular-nums; }
+
 #shot-compass {
   position: absolute; bottom: 16px; right: 16px; width: 130px; height: 130px;
   background: rgba(8,12,24,0.8); border-radius: 50%;

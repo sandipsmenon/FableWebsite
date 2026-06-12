@@ -47,6 +47,19 @@ export class Hud {
     this.compass = this.el('div', 'shot-compass');
     this.buildCompass();
     this.compass.style.display = 'none';
+
+    this.speedGun = this.el('div', 'speed-gun');
+  }
+
+  private speedGun!: HTMLElement;
+  private speedTimer?: number;
+
+  /** Broadcast speed-gun readout for the current delivery. */
+  showSpeed(kph: number): void {
+    this.speedGun.innerHTML = `<span class="kph">${kph.toFixed(1)}</span> kph`;
+    this.speedGun.style.opacity = '1';
+    if (this.speedTimer) clearTimeout(this.speedTimer);
+    this.speedTimer = window.setTimeout(() => (this.speedGun.style.opacity = '0'), 2600);
   }
 
   private el(tag: string, id: string): HTMLElement {
