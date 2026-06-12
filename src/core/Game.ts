@@ -102,6 +102,7 @@ export class Game {
   private resolved?: ResolvedBall;
   private pathTime = 0;
   private pendingNoBall = false;
+  private pendingSwing?: { at: number; shot: ShotInput; variant: 'low' | 'mid' | 'high'; speed: number };
   private extraRunRequested = false;
   private extraRunDone = false;
   private overSymbols: string[] = [];
@@ -387,6 +388,7 @@ export class Game {
     this.delivery = undefined;
     this.liveBall = undefined;
     this.pendingNoBall = false;
+    this.pendingSwing = undefined;
     this.extraRunRequested = false;
     this.extraRunDone = false;
     this.deadHandled = false;
@@ -518,11 +520,28 @@ export class Game {
     });
     this.shotTaken = true;
 
-    // Animate the batter
+    // Schedule the batter's swing so the clip's 'impact' keyframe lands exactly
+    // at the sim's bat-contact instant (clips put impact ~0.2s in).
     if (shot.type !== 'leave') {
-      if (shot.type === 'defensive') this.striker.playBlock();
-      else this.striker.playSwing(shot.direction);
+      const contactY = this.resolved.contactState.pos.y;
+      const variant: 'low' | 'mid' | 'high' = contactY < 0.45 ? 'low' : contactY > 1.0 ? 'high' : 'mid';
+      const impactOffset = shot.type === 'defensive' ? 0.2 : variant === 'high' ? 0.24 : variant === 'low' ? 0.2 : 0.22;
+      const contactAbs = this.releaseTime + this.resolved.contactTime;
+      const remaining = contactAbs - this.time;
+      if (remaining >= impactOffset) {
+        this.pendingSwing = { at: contactAbs - impactOffset, shot, variant, speed: 1 };
+      } else {
+        this.pendingSwing = { at: this.time, shot, variant, speed: impactOffset / Math.max(0.07, remaining) };
+      }
     }
+  }
+
+  private firePendingSwing(): void {
+    if (!this.pendingSwing || this.time < this.pendingSwing.at) return;
+    const { shot, variant, speed } = this.pendingSwing;
+    this.pendingSwing = undefined;
+    if (shot.type === 'defensive') this.striker.playBlock(speed);
+    else this.striker.playSwing(shot.direction, variant, speed);
   }
 
   // =================== Frame update ===================
@@ -671,6 +690,7 @@ export class Game {
 
   private updateBallInFlight(dt: number): void {
     if (!this.delivery || !this.liveBall) return;
+    this.firePendingSwing();
 
     // Step the real ball for visuals until contact/result takes over.
     const before = this.liveBall.bounced;
@@ -763,6 +783,7 @@ export class Game {
 
   private updateBallLive(dt: number): void {
     if (!this.resolved || !this.liveBall || !this.delivery) return;
+    this.firePendingSwing();
     const r = this.resolved;
     const out = r.outcome;
 

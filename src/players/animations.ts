@@ -208,6 +208,96 @@ export const battingSwing: Clip = {
   ],
 };
 
+/** Low swing: yorker/full-ball dig-out — bat sweeps close to the ground. */
+export const battingSwingLow: Clip = {
+  name: 'battingSwingLow',
+  duration: 0.5,
+  keyframes: [
+    {
+      t: 0,
+      pose: {
+        spine: [d(26), d(22), 0],
+        head: [d(-14), d(-30), 0],
+        shoulderL: [d(-50), d(12), d(-26)], elbowL: [d(-60), 0, 0],
+        shoulderR: [d(-45), 0, d(40)], elbowR: [d(-70), 0, 0],
+        hipL: [d(-14), 0, d(-6)], kneeL: [d(16), 0, 0],
+        hipR: [d(-10), 0, d(6)], kneeR: [d(14), 0, 0],
+        hipsY: 0.9,
+      },
+    },
+    {
+      t: 0.2,
+      event: 'impact',
+      pose: {
+        spine: [d(42), d(-2), 0],
+        head: [d(-22), d(-8), 0],
+        shoulderL: [d(-30), d(-5), d(-8)], elbowL: [d(-12), 0, 0],
+        shoulderR: [d(-26), 0, d(10)], elbowR: [d(-16), 0, 0],
+        hipL: [d(-48), 0, d(-4)], kneeL: [d(12), 0, 0],
+        hipR: [d(16), 0, d(6)], kneeR: [d(46), 0, 0],
+        hipsY: 0.8,
+      },
+    },
+    {
+      t: 0.5,
+      pose: {
+        spine: [d(30), d(-18), 0],
+        head: [d(-15), d(5), 0],
+        shoulderL: [d(-65), d(-15), d(5)], elbowL: [d(-30), 0, 0],
+        shoulderR: [d(-60), 0, d(0)], elbowR: [d(-40), 0, 0],
+        hipL: [d(-35), 0, d(-4)], kneeL: [d(10), 0, 0],
+        hipR: [d(18), 0, d(6)], kneeR: [d(40), 0, 0],
+        hipsY: 0.86,
+      },
+    },
+  ],
+};
+
+/** High swing: pull/cut at chest height — flat horizontal bat, body pivots. */
+export const battingSwingHigh: Clip = {
+  name: 'battingSwingHigh',
+  duration: 0.55,
+  keyframes: [
+    {
+      t: 0,
+      pose: {
+        spine: [d(10), d(35), 0],
+        head: [d(-6), d(-38), 0],
+        shoulderL: [d(-95), d(20), d(-40)], elbowL: [d(-75), 0, 0],
+        shoulderR: [d(-85), 0, d(55)], elbowR: [d(-85), 0, 0],
+        hipL: [d(-10), 0, d(-8)], kneeL: [d(14), 0, 0],
+        hipR: [d(-8), 0, d(8)], kneeR: [d(12), 0, 0],
+        hipsY: 0.94,
+      },
+    },
+    {
+      t: 0.24,
+      event: 'impact',
+      pose: {
+        spine: [d(4), d(-15), 0],
+        head: [d(-2), d(0), 0],
+        shoulderL: [d(-92), d(-18), d(0)], elbowL: [d(-10), 0, 0],
+        shoulderR: [d(-88), 0, d(5)], elbowR: [d(-14), 0, 0],
+        hipL: [d(-18), 0, d(-8)], kneeL: [d(12), 0, 0],
+        hipR: [d(6), 0, d(8)], kneeR: [d(22), 0, 0],
+        hipsY: 0.95,
+      },
+    },
+    {
+      t: 0.55,
+      pose: {
+        spine: [d(0), d(-55), 0],
+        head: [d(0), d(20), 0],
+        shoulderL: [d(-110), d(-40), d(25)], elbowL: [d(-50), 0, 0],
+        shoulderR: [d(-105), 0, d(-20)], elbowR: [d(-55), 0, 0],
+        hipL: [d(-22), 0, d(-8)], kneeL: [d(10), 0, 0],
+        hipR: [d(10), 0, d(8)], kneeR: [d(28), 0, 0],
+        hipsY: 0.97,
+      },
+    },
+  ],
+};
+
 /** Compact defensive block. */
 export const defensiveBlock: Clip = {
   name: 'defensiveBlock',

@@ -3,7 +3,11 @@ import { Team } from '../match/Teams';
 import { PITCH, SHOT_ANGLES, ShotDirection } from '../sim/types';
 import { SkinnedHuman } from './SkinnedHuman';
 import { PoseAnimator } from './PoseAnimator';
+import { solveLeftArmToTarget } from './ArmIK';
+import { BatTrail } from '../render/BatTrail';
 import * as anim from './animations';
+
+export type SwingHeight = 'low' | 'mid' | 'high';
 
 const SKIN_TONES = [0xe8c39e, 0xc68642, 0x8d5524, 0xf1d3b3];
 
@@ -21,6 +25,10 @@ export class PlayerActor {
   readonly animator: PoseAnimator;
   private move?: MoveTask;
   private shuttle?: { runs: number; spr: number; elapsed: number; startAtBowlerEnd: boolean };
+  private batTrail?: BatTrail;
+  private gripTarget = new THREE.Vector3();
+  private batTip = new THREE.Vector3();
+  private batBase = new THREE.Vector3();
 
   private constructor(rig: SkinnedHuman) {
     this.rig = rig;
@@ -97,18 +105,20 @@ export class PlayerActor {
     this.rig.root.rotation.y = 0.5;
   }
 
-  playSwing(direction: ShotDirection): void {
+  playSwing(direction: ShotDirection, height: SwingHeight = 'mid', speed = 1): void {
     // Rotate the body toward the shot, then swing through.
     const angle = SHOT_ANGLES[direction];
     this.rig.root.rotation.y = 0.2 + angle * 0.55;
-    this.animator.play(anim.battingSwing);
+    const clip = height === 'low' ? anim.battingSwingLow : height === 'high' ? anim.battingSwingHigh : anim.battingSwing;
+    this.animator.play(clip, speed);
+    this.batTrail?.trigger(clip.duration / speed);
     this.animator.onComplete = () => {
       this.animator.onComplete = undefined;
     };
   }
 
-  playBlock(): void {
-    this.animator.play(anim.defensiveBlock);
+  playBlock(speed = 1): void {
+    this.animator.play(anim.defensiveBlock, speed);
   }
 
   playCrouch(): void {
@@ -194,6 +204,32 @@ export class PlayerActor {
     };
   }
 
+  /** Two-handed grip + swing trail, active in batting poses only. */
+  private updateBatting(dt: number): void {
+    const bat = this.rig.bat;
+    if (!bat) return;
+    const clip = this.animator.currentName;
+    const batting = clip === undefined || clip.startsWith('batting') || clip === 'defensiveBlock';
+    if (!batting) {
+      this.batTrail?.update(dt, this.batTip, this.batBase);
+      return;
+    }
+    // Plant the left hand on the bat handle (just above the right hand).
+    bat.updateWorldMatrix(true, false);
+    this.gripTarget.set(0, 0.07, 0).applyMatrix4(bat.matrixWorld);
+    solveLeftArmToTarget(this.rig, this.gripTarget);
+
+    if (!this.batTrail) {
+      this.batTrail = new BatTrail();
+      this.rig.root.parent?.add(this.batTrail.mesh);
+    }
+    if (!this.batTrail.mesh.parent && this.rig.root.parent) this.rig.root.parent.add(this.batTrail.mesh);
+    bat.updateWorldMatrix(true, false);
+    this.batTip.set(0, -0.74, 0).applyMatrix4(bat.matrixWorld);
+    this.batBase.set(0, -0.18, 0).applyMatrix4(bat.matrixWorld);
+    this.batTrail.update(dt, this.batTip, this.batBase);
+  }
+
   /** Shuttle between the creases `runs` times. */
   runBetweenWickets(runs: number, secondsPerRun: number, startAtBowlerEnd = false): void {
     if (runs <= 0) return;
@@ -203,6 +239,7 @@ export class PlayerActor {
 
   update(dt: number): void {
     this.animator.update(dt);
+    this.updateBatting(dt);
 
     if (this.move) {
       this.move.elapsed += dt;
