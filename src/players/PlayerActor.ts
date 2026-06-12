@@ -90,14 +90,14 @@ export class PlayerActor {
 
   playStance(): void {
     this.animator.play(anim.battingStance);
-    // Side-on stance: face slightly toward point/cover with head turned to the bowler.
-    this.rig.root.rotation.y = Math.PI + 0.5;
+    // Facing the bowler (+z), angled slightly toward the off side for a side-on look.
+    this.rig.root.rotation.y = 0.5;
   }
 
   playSwing(direction: ShotDirection): void {
     // Rotate the body toward the shot, then swing through.
     const angle = SHOT_ANGLES[direction];
-    this.rig.root.rotation.y = Math.PI + 0.3 - angle * 0.55;
+    this.rig.root.rotation.y = 0.2 + angle * 0.55;
     this.animator.play(anim.battingSwing);
     this.animator.onComplete = () => {
       this.animator.onComplete = undefined;

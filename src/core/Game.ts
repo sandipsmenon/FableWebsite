@@ -272,7 +272,6 @@ export class Game {
     }
 
     this.striker.setPosition(-0.25, 0.75);
-    this.striker.rig.root.rotation.y = Math.PI; // face the bowler... stance pose handles side-on look
     this.striker.playStance();
     this.nonStriker.setPosition(0.9, PITCH.bowlerCreaseZ - 0.4);
     this.nonStriker.faceToward(0, 0);
@@ -618,17 +617,18 @@ export class Game {
   // ----- ball in flight (delivery toward batter) -----
 
   private heldDirection(): ShotDirection {
+    // Broadcast camera looks down the pitch from behind the bowler: screen-right = +x = off side.
     const up = this.input.isDown('ArrowUp') || this.input.isDown('KeyW');
     const down = this.input.isDown('ArrowDown') || this.input.isDown('KeyS');
-    const left = this.input.isDown('ArrowLeft') || this.input.isDown('KeyA'); // screen-left = off side (+x)
-    const right = this.input.isDown('ArrowRight') || this.input.isDown('KeyD'); // leg side (-x)
-    if (up && left) return 'offDrive';
-    if (up && right) return 'onDrive';
-    if (down && left) return 'cut';
-    if (down && right) return 'pull';
+    const right = this.input.isDown('ArrowRight') || this.input.isDown('KeyD'); // off side (+x)
+    const left = this.input.isDown('ArrowLeft') || this.input.isDown('KeyA'); // leg side (-x)
+    if (up && right) return 'offDrive';
+    if (up && left) return 'onDrive';
+    if (down && right) return 'cut';
+    if (down && left) return 'pull';
     if (up) return 'straight';
-    if (left) return 'coverDrive';
-    if (right) return 'flick';
+    if (right) return 'coverDrive';
+    if (left) return 'flick';
     if (down) return 'glance';
     return 'straight';
   }
