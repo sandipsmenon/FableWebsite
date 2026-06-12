@@ -7,6 +7,97 @@ function makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D]
   return [c, c.getContext('2d')!];
 }
 
+const kitCache = new Map<string, THREE.CanvasTexture>();
+
+/**
+ * Kit atlas for SkinnedHuman bodies. Four horizontal bands (bottom -> top in UV v):
+ * jersey [0.00-0.25], trousers [0.25-0.50], skin [0.50-0.75], shoes [0.75-1.00].
+ * Canvas y axis is flipped relative to v (flipY), so band k paints at rows from the top.
+ */
+export function kitTexture(opts: {
+  jersey: number;
+  trim: number;
+  trousers: number;
+  skin: number;
+}): THREE.CanvasTexture {
+  const key = `${opts.jersey}-${opts.trim}-${opts.trousers}-${opts.skin}`;
+  const cached = kitCache.get(key);
+  if (cached) return cached;
+
+  const size = 256;
+  const [c, g] = makeCanvas(size);
+  const band = size / 4;
+  const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+  const shade = (n: number, f: number) => {
+    const r = Math.min(255, ((n >> 16) & 255) * f);
+    const gg = Math.min(255, ((n >> 8) & 255) * f);
+    const b = Math.min(255, (n & 255) * f);
+    return `rgb(${r | 0},${gg | 0},${b | 0})`;
+  };
+
+  // With flipY, v=0 maps to the BOTTOM canvas row. Band order bottom-up:
+  // jersey (canvas rows 3*band..4*band), trousers (2..3), skin (1..2), shoes (0..1).
+  const bandTop = (i: number) => size - (i + 1) * band; // i = band index in v space
+
+  // Jersey: vertical gradient + chest stripe + hem trim. v within band maps along the body.
+  const jy = bandTop(0);
+  const grad = g.createLinearGradient(0, jy, 0, jy + band);
+  grad.addColorStop(0, shade(opts.jersey, 1.12)); // shoulders slightly lighter
+  grad.addColorStop(1, shade(opts.jersey, 0.82));
+  g.fillStyle = grad;
+  g.fillRect(0, jy, size, band);
+  // Chest stripe (~62% up the jersey -> canvas y = jy + 0.38*band)
+  g.fillStyle = hex(opts.trim);
+  g.fillRect(0, jy + band * 0.34, size, band * 0.1);
+  g.fillStyle = shade(opts.trim, 0.7);
+  g.fillRect(0, jy + band * 0.44, size, band * 0.03);
+  // Hem trim at the bottom of the shirt (v ~ 0 -> canvas bottom of band)
+  g.fillStyle = hex(opts.trim);
+  g.fillRect(0, jy + band - 8, size, 8);
+
+  // Trousers: solid + subtle side shading
+  const ty = bandTop(1);
+  const tg = g.createLinearGradient(0, ty, 0, ty + band);
+  tg.addColorStop(0, shade(opts.trousers, 1.05));
+  tg.addColorStop(1, shade(opts.trousers, 0.78));
+  g.fillStyle = tg;
+  g.fillRect(0, ty, size, band);
+
+  // Skin: flat tone, gentle vertical shading
+  const sy = bandTop(2);
+  const sg = g.createLinearGradient(0, sy, 0, sy + band);
+  sg.addColorStop(0, shade(opts.skin, 1.05));
+  sg.addColorStop(1, shade(opts.skin, 0.88));
+  g.fillStyle = sg;
+  g.fillRect(0, sy, size, band);
+
+  // Shoes: white upper, dark sole at the very bottom of the band (v near 0.75)
+  const hy = bandTop(3);
+  g.fillStyle = '#e8e8e6';
+  g.fillRect(0, hy, size, band);
+  g.fillStyle = hex(opts.trim);
+  g.fillRect(0, hy + band * 0.55, size, band * 0.18);
+  g.fillStyle = '#22252a';
+  g.fillRect(0, hy + band - 10, size, 10);
+
+  // Subtle fabric noise over everything
+  const img = g.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * 9;
+    d[i] += n;
+    d[i + 1] += n;
+    d[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  kitCache.set(key, tex);
+  return tex;
+}
+
+
 /** Outfield grass: concentric mowing rings + noise, 30-yard circle painted in. */
 export function grassTexture(size = 2048): THREE.CanvasTexture {
   const [c, g] = makeCanvas(size);

@@ -1,4 +1,4 @@
-import { HumanoidRig, JointName } from './HumanoidRig';
+import { AnimRig, JointName } from './SkinnedHuman';
 
 /** Joint rotations in radians (x, y, z Euler) plus optional hip height offset. */
 export type Pose = Partial<Record<JointName, [number, number, number]>> & {
@@ -30,7 +30,7 @@ export class PoseAnimator {
   onEvent?: (name: string) => void;
   onComplete?: () => void;
 
-  constructor(private rig: HumanoidRig) {}
+  constructor(private rig: AnimRig) {}
 
   play(clip: Clip, speed = 1): void {
     this.clip = clip;

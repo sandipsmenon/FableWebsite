@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Team } from '../match/Teams';
 import { PITCH, SHOT_ANGLES, ShotDirection } from '../sim/types';
-import { HumanoidRig } from './HumanoidRig';
+import { SkinnedHuman } from './SkinnedHuman';
 import { PoseAnimator } from './PoseAnimator';
 import * as anim from './animations';
 
@@ -15,24 +15,25 @@ interface MoveTask {
   onComplete?: () => void;
 }
 
-/** A player on the field: procedural rig + animator + movement tasks. */
+/** A player on the field: procedural skinned rig + animator + movement tasks. */
 export class PlayerActor {
-  readonly rig: HumanoidRig;
+  readonly rig: SkinnedHuman;
   readonly animator: PoseAnimator;
   private move?: MoveTask;
   private shuttle?: { runs: number; spr: number; elapsed: number; startAtBowlerEnd: boolean };
 
-  private constructor(rig: HumanoidRig) {
+  private constructor(rig: SkinnedHuman) {
     this.rig = rig;
     this.animator = new PoseAnimator(rig);
   }
 
   static batsman(scene: THREE.Scene, team: Team): PlayerActor {
-    const rig = new HumanoidRig({
-      shirt: team.primaryColor,
-      trousers: 0xf5f5f0,
+    const rig = new SkinnedHuman({
+      jersey: team.primaryColor,
+      trim: team.secondaryColor,
+      trousers: team.primaryColor,
       skin: SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)],
-      hat: team.secondaryColor,
+      hatColor: team.secondaryColor,
       helmet: true,
     });
     rig.addBat();
@@ -42,11 +43,12 @@ export class PlayerActor {
   }
 
   static fielder(scene: THREE.Scene, team: Team): PlayerActor {
-    const rig = new HumanoidRig({
-      shirt: team.primaryColor,
+    const rig = new SkinnedHuman({
+      jersey: team.primaryColor,
+      trim: team.secondaryColor,
       trousers: team.primaryColor,
       skin: SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)],
-      hat: team.secondaryColor,
+      hatColor: team.secondaryColor,
     });
     scene.add(rig.root);
     return new PlayerActor(rig);
@@ -58,11 +60,12 @@ export class PlayerActor {
   }
 
   static umpire(scene: THREE.Scene): PlayerActor {
-    const rig = new HumanoidRig({
-      shirt: 0xf5f5f5,
+    const rig = new SkinnedHuman({
+      jersey: 0xf5f5f5,
+      trim: 0x222428,
       trousers: 0x222428,
       skin: SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)],
-      hat: 0xf5f5f5,
+      hatColor: 0xf5f5f5,
     });
     scene.add(rig.root);
     return new PlayerActor(rig);

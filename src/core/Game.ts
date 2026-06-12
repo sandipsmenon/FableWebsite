@@ -34,6 +34,7 @@ import { Field } from '../render/Field';
 import { SceneManager } from '../render/SceneManager';
 import { Stadium } from '../render/Stadium';
 import { PlayerActor } from '../players/PlayerActor';
+import { runCycle as runCycleClip } from '../players/animations';
 import { scorecardHtml } from '../ui/ScorecardView';
 import { Hud } from '../ui/Hud';
 import { Input } from './Input';
@@ -136,8 +137,12 @@ export class Game {
     window.addEventListener('pointerdown', () => this.audio.init(), { once: true });
     window.addEventListener('keydown', () => this.audio.init(), { once: true });
 
-    this.showMenu();
-    this.cam.snap('orbit');
+    if (new URLSearchParams(location.search).has('rigdebug')) {
+      this.setupRigDebug();
+    } else {
+      this.showMenu();
+      this.cam.snap('orbit');
+    }
 
     let last = performance.now();
     const loop = (now: number) => {
@@ -149,6 +154,37 @@ export class Game {
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+
+  /** Test hook (?rigdebug=1): line up rigs close to a fixed camera to inspect bodies/poses. */
+  private rigDebugActors: PlayerActor[] = [];
+  private setupRigDebug(): void {
+    this.phase = 'menu';
+    const team0 = TEAMS[0];
+    const team1 = TEAMS[1];
+    const stance = PlayerActor.batsman(this.sm.scene, team0);
+    stance.setPosition(-2.2, 8);
+    stance.playStance();
+    const swing = PlayerActor.batsman(this.sm.scene, team0);
+    swing.setPosition(-0.8, 8);
+    swing.playStance();
+    window.setInterval(() => swing.playSwing('coverDrive'), 1600);
+    const bowler = PlayerActor.fielder(this.sm.scene, team1);
+    bowler.setPosition(0.6, 8);
+    bowler.faceToward(0.6, -10);
+    window.setInterval(() => bowler.playBowling(1, () => {}), 2200);
+    const runner = PlayerActor.fielder(this.sm.scene, team1);
+    runner.setPosition(2.0, 8);
+    runner.faceToward(2.0, -10);
+    runner.animator.play(runCycleClip);
+    const ump = PlayerActor.umpire(this.sm.scene);
+    ump.setPosition(3.4, 8);
+    ump.faceToward(3.4, -10);
+    window.setInterval(() => ump.playUmpireSignal('out'), 2600);
+    this.rigDebugActors = [stance, swing, bowler, runner, ump];
+    this.sm.camera.position.set(0.5, 1.5, 3.2);
+    this.sm.camera.lookAt(0.5, 1.1, 8);
+    this.cam.update = () => {}; // freeze the camera director
   }
 
   // =================== Menu / Toss ===================
@@ -498,7 +534,7 @@ export class Game {
     this.effects.update(dt);
     this.cam.update(dt, this.time);
 
-    for (const a of [this.striker, this.nonStriker, this.bowlerActor, this.keeperActor, this.umpire, ...this.fielderActors]) {
+    for (const a of [this.striker, this.nonStriker, this.bowlerActor, this.keeperActor, this.umpire, ...this.fielderActors, ...this.rigDebugActors]) {
       a?.update(dt);
     }
 
