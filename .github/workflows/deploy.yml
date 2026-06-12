@@ -1,21 +1,19 @@
-name: Deploy to GitHub Pages
+name: Deploy Cricket Game to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/mac-cricket-game-8k74ak]
+    branches: [claude/mac-cricket-game-8k74ak]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: pages-cricket
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,20 +22,31 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
       - run: npm test
       - run: npm run build
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # Publish into gh-pages/cricket without touching the rest of the site.
+      - name: Publish dist to gh-pages/cricket
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch origin gh-pages; then
+            git worktree add site origin/gh-pages
+            cd site
+            git checkout -B gh-pages
+          else
+            git worktree add --detach site
+            cd site
+            git checkout --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+          rm -rf cricket
+          mkdir cricket
+          cp -r ../dist/. cricket/
+          touch .nojekyll
+          git add -A
+          git commit -m "Deploy cricket game ${GITHUB_SHA}" || echo "Nothing to deploy"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
