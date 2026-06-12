@@ -483,7 +483,10 @@ export class Game {
     this.delivery = d;
     this.phase = 'runUp';
     this.phaseTime = 0;
-    this.cam.setMode('broadcast');
+    // Occasional stump-cam for variety when the AI is batting (pure cinematics).
+    if (!this.match.userIsBatting && this.rng.chance(0.25)) this.cam.setMode('stumpCam');
+    else this.cam.setMode('broadcast');
+    this.cam.setTension(1);
     const isSpin = (this.match.bowler.bowlStyle ?? 'pace') === 'spin';
     this.bowlerActor.startRunUp(0.35, PITCH.bowlerCreaseZ + (isSpin ? 4 : 9), PITCH.bowlerCreaseZ + 0.3, isSpin ? 2.8 : 6.5, () => {
       // Delivery stride: play bowling action; release event launches the ball.
@@ -777,7 +780,7 @@ export class Game {
       this.audio.batHit(r.quality === 'perfect' ? 1 : 0.6);
       this.tracker.appendPath(r.path);
       if (this.turbo === 1) this.timeScale = 0.3; // cinematic beat on contact
-      this.cam.setMode('ballFollow');
+      this.cam.setMode('ballFollow', 0.4); // let the stroke read before cutting away
       // Send the chosen fielder after the ball.
       if (r.intercept && r.intercept.fielderIndex > 0) {
         const fa = this.fielderActors[r.intercept.fielderIndex - 1];
@@ -861,6 +864,7 @@ export class Game {
   private beginDead(out: { runs: number; boundary?: 4 | 6; wicket?: { how: string; fielder?: string }; wide?: boolean; text: string }): void {
     this.phase = 'ballDead';
     this.phaseTime = 0;
+    this.cam.setTension(0);
     this.hud.showRunPrompt(false);
 
     const isWicket = !!out.wicket;
@@ -873,7 +877,7 @@ export class Game {
       );
       this.stadium.triggerCheer(1);
       this.audio.cheer(1);
-      if (out.boundary) this.cam.setMode('crane');
+      if (out.boundary) this.cam.setMode('boundary');
       if (isWicket) {
         this.umpire.playUmpireSignal('out');
         this.hud.showToast(out.text, '#ffb0b0', 2200);

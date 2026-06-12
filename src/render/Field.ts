@@ -53,7 +53,13 @@ export class Field {
 
   static makeStumps(): THREE.Group {
     const g = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0xe8d9b0, roughness: 0.6 });
+    // Modern LED stumps: dark body with a cool glow that flashes when broken.
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x141c28,
+      emissive: 0x35c4ff,
+      emissiveIntensity: 0.75,
+      roughness: 0.35,
+    });
     const stumpGeo = new THREE.CylinderGeometry(0.022, 0.022, PITCH.stumpHeight, 8);
     for (const x of [-PITCH.stumpHalfWidth, 0, PITCH.stumpHalfWidth]) {
       const s = new THREE.Mesh(stumpGeo, mat);

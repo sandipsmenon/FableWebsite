@@ -9,6 +9,7 @@ import { adBoardTexture, crowdTexture } from './ProceduralTextures';
 export class Stadium {
   readonly group = new THREE.Group();
   private crowdMats: THREE.MeshLambertMaterial[] = [];
+  private crowdUniforms = { uTime: { value: 0 }, uCheer: { value: 0 } };
   private scoreboardCanvas: HTMLCanvasElement;
   private scoreboardTex: THREE.CanvasTexture;
   private cheer = 0;
@@ -19,7 +20,7 @@ export class Stadium {
 
     // ----- Ad boards ring around the boundary -----
     const adTex = adBoardTexture();
-    adTex.repeat.set(8, 1);
+    adTex.repeat.set(-8, 1); // negative: counteract BackSide mirroring so text reads correctly
     const adRing = new THREE.Mesh(
       new THREE.CylinderGeometry(innerR - 8, innerR - 8, 0.9, 96, 1, true),
       new THREE.MeshLambertMaterial({
@@ -33,17 +34,16 @@ export class Stadium {
     adRing.position.set(0, 0.45, cz);
     this.group.add(adRing);
 
-    // ----- Stands: two sloped tiers all the way around -----
+    // ----- Stands: instanced individual crowd (lower tier) + textured upper tier -----
     const crowdTex = crowdTexture();
-    const tierData = [
-      { r0: innerR, r1: innerR + 16, y0: 1.2, y1: 9 },
-      { r0: innerR + 17, r1: innerR + 34, y0: 10.5, y1: 21 },
-    ];
-    for (const t of tierData) {
-      const tier = this.makeTier(t.r0, t.r1, t.y0, t.y1, crowdTex);
-      tier.position.set(0, 0, cz);
-      this.group.add(tier);
-    }
+    this.buildInstancedCrowd(innerR, innerR + 16, 1.2, 9, cz);
+    // Dark seating slope behind the instanced people
+    const slope = this.makeTier(innerR, innerR + 16, 1.2, 9, null);
+    slope.position.set(0, 0, cz);
+    this.group.add(slope);
+    const upper = this.makeTier(innerR + 17, innerR + 34, 10.5, 21, crowdTex);
+    upper.position.set(0, 0, cz);
+    this.group.add(upper);
 
     // Concrete facade below tier 1 and between tiers
     const facadeMat = new THREE.MeshLambertMaterial({ color: 0x9aa0a8 });
@@ -108,25 +108,73 @@ export class Stadium {
     this.drawScoreboard('FABLE CRICKET', '', '');
   }
 
-  private makeTier(r0: number, r1: number, y0: number, y1: number, crowdTex: THREE.Texture): THREE.Mesh {
-    // A sloped truncated cone ring of "crowd" texture.
+  private makeTier(r0: number, r1: number, y0: number, y1: number, crowdTex: THREE.Texture | null): THREE.Mesh {
+    // A sloped truncated cone ring: crowd texture, or dark seating if no texture.
     const segments = 96;
     const geo = new THREE.CylinderGeometry(r1, r0, y1 - y0, segments, 1, true);
-    const tex = crowdTex.clone();
-    tex.needsUpdate = true;
-    tex.repeat.set(10, 1);
-    tex.wrapS = THREE.RepeatWrapping;
-    const mat = new THREE.MeshLambertMaterial({
-      map: tex,
-      side: THREE.BackSide,
-      emissive: 0xffffff,
-      emissiveMap: tex,
-      emissiveIntensity: 0.4,
-    });
-    this.crowdMats.push(mat);
+    let mat: THREE.MeshLambertMaterial;
+    if (crowdTex) {
+      const tex = crowdTex.clone();
+      tex.needsUpdate = true;
+      tex.repeat.set(10, 1);
+      tex.wrapS = THREE.RepeatWrapping;
+      mat = new THREE.MeshLambertMaterial({
+        map: tex,
+        side: THREE.BackSide,
+        emissive: 0xffffff,
+        emissiveMap: tex,
+        emissiveIntensity: 0.4,
+      });
+      this.crowdMats.push(mat);
+    } else {
+      mat = new THREE.MeshLambertMaterial({ color: 0x2c313c, side: THREE.BackSide });
+    }
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.y = (y0 + y1) / 2;
     return mesh;
+  }
+
+  /** Individual spectators on the lower tier: one InstancedMesh, sway via shader. */
+  private buildInstancedCrowd(r0: number, r1: number, y0: number, y1: number, cz: number): void {
+    const COUNT = 2600;
+    const geo = new THREE.PlaneGeometry(0.5, 0.72);
+    const phases = new Float32Array(COUNT);
+    const mat = new THREE.MeshLambertMaterial({ emissive: 0xffffff, emissiveIntensity: 0.32 });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.crowdUniforms.uTime;
+      shader.uniforms.uCheer = this.crowdUniforms.uCheer;
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform float uTime;\nuniform float uCheer;\nattribute float aPhase;',
+        )
+        .replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\ntransformed.y += (0.04 + uCheer * 0.22) * sin(uTime * 8.0 + aPhase) * step(0.05, position.y);',
+        );
+    };
+    const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
+    geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
+    const dummy = new THREE.Object3D();
+    const palette = [0xd8334a, 0x3a66d8, 0x36a851, 0xe8d44d, 0x9b59b6, 0xe67e22, 0xf1f1f1, 0x4dc3ff, 0xc68642, 0x8d5524];
+    const color = new THREE.Color();
+    for (let i = 0; i < COUNT; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const t = Math.random();
+      const r = THREE.MathUtils.lerp(r0 + 1.2, r1 - 0.8, t);
+      const y = THREE.MathUtils.lerp(y0 + 0.5, y1 - 0.3, t) + 0.36;
+      dummy.position.set(Math.cos(a) * r, y, cz + Math.sin(a) * r);
+      dummy.lookAt(0, y, cz);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      color.setHex(palette[Math.floor(Math.random() * palette.length)]);
+      color.multiplyScalar(0.55 + Math.random() * 0.5);
+      mesh.setColorAt(i, color);
+      phases[i] = Math.random() * Math.PI * 2;
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    this.group.add(mesh);
   }
 
   private makeFloodlight(): THREE.Group {
@@ -145,7 +193,8 @@ export class Stadium {
     );
     head.add(panel);
     const lampGeo = new THREE.CircleGeometry(0.42, 12);
-    const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
+    // Over-bright so the bloom pass makes the heads glow like real floodlights.
+    const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 4.6, 3.9) });
     for (let r = 0; r < 4; r++) {
       for (let c = 0; c < 6; c++) {
         const lamp = new THREE.Mesh(lampGeo, lampMat);
@@ -189,6 +238,8 @@ export class Stadium {
 
   update(dt: number, time: number): void {
     this.cheer = Math.max(0, this.cheer - dt * 0.4);
+    this.crowdUniforms.uTime.value = time;
+    this.crowdUniforms.uCheer.value = this.cheer;
     const pulse = 1 + this.cheer * 0.18 * Math.sin(time * 14);
     for (const m of this.crowdMats) {
       m.color.setScalar(pulse);

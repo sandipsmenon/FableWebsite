@@ -16,8 +16,16 @@ export class Effects {
 
   constructor(private scene: THREE.Scene) {}
 
-  /** Send stumps & bails flying from a ball impact. */
+  private ledFlash: THREE.MeshStandardMaterial[] = [];
+
+  /** Send stumps & bails flying from a ball impact, LED flash included. */
   explodeStumps(stumps: THREE.Group, ballVel: THREE.Vector3): void {
+    stumps.traverse((o) => {
+      if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshStandardMaterial) {
+        o.material.emissiveIntensity = 6;
+        if (!this.ledFlash.includes(o.material)) this.ledFlash.push(o.material);
+      }
+    });
     for (const child of [...stumps.children]) {
       if (this.fragments.some((f) => f.mesh === child)) continue;
       const isBail = child.name === 'bail';
@@ -61,6 +69,13 @@ export class Effects {
   }
 
   update(dt: number): void {
+    for (let i = this.ledFlash.length - 1; i >= 0; i--) {
+      const m = this.ledFlash[i];
+      m.emissiveIntensity = Math.max(0.75, m.emissiveIntensity - dt * 6);
+      // Strobe while hot
+      if (m.emissiveIntensity > 1) m.emissiveIntensity *= 0.8 + 0.4 * Math.random();
+      if (m.emissiveIntensity <= 0.76) this.ledFlash.splice(i, 1);
+    }
     for (const f of this.fragments) {
       f.vel.y -= 9.81 * dt;
       f.mesh.position.addScaledVector(f.vel, dt);

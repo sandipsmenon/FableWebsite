@@ -107,15 +107,23 @@ export function grassTexture(size = 2048): THREE.CanvasTexture {
   const R = size / 2;
   const ppm = R / 78;
 
-  // Concentric mowing rings
+  // Concentric mowing rings (high contrast for the broadcast look)
   const ringW = 5 * ppm;
   for (let r = R; r > 0; r -= ringW) {
     const band = Math.floor(r / ringW) % 2 === 0;
-    g.fillStyle = band ? '#3d7a2f' : '#46893a';
+    g.fillStyle = band ? '#33691e' : '#4a8f33';
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
     g.fill();
   }
+  // Darker vignette toward the rope
+  const vg = g.createRadialGradient(cx, cy, 60 * ppm, cx, cy, 78 * ppm);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,20,0,0.28)');
+  g.fillStyle = vg;
+  g.beginPath();
+  g.arc(cx, cy, R, 0, Math.PI * 2);
+  g.fill();
 
   // Grass noise speckle
   const img = g.getImageData(0, 0, size, size);
